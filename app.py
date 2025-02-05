@@ -14,6 +14,9 @@ st.set_page_config(
 # 设置日志
 logging.basicConfig(level=logging.INFO)
 
+# 在文件顶部添加
+PPTX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
 def main():
     st.markdown("""
     <style>
@@ -105,7 +108,8 @@ def main():
                     label="📥 下载翻译后的文件",
                     data=file,
                     file_name=f"translated_{uploaded_file.name}",
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    mime=PPTX_MIME_TYPE,
+                    key="download_button"
                 )
                 
         except Exception as e:
@@ -120,4 +124,4 @@ def main():
                 pass
 
 if __name__ == "__main__":
-    main()  
+    main()
