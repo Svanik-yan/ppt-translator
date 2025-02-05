@@ -116,61 +116,61 @@ class PPTTranslator:
     def replace_text(self, ppt_path: str, elements: List[TextElement], output_path: str):
         """Replace original text with translations while preserving formatting"""
         prs = Presentation(ppt_path)
-        text_map = {(e.slide_idx, e.shape_idx, e.original_text): e for e in elements}
         
+        # 修改文本匹配逻辑
         for slide_idx, slide in enumerate(prs.slides):
             for shape_idx, shape in enumerate(slide.shapes):
                 if not hasattr(shape, "text_frame"):
                     continue
                     
                 text_frame = shape.text_frame
+                
+                # 处理每个段落
                 for paragraph in text_frame.paragraphs:
-                    for run in paragraph.runs:
-                        key = (slide_idx, shape_idx, run.text)
-                        if key in text_map:
-                            element = text_map[key]
-                            if not element.translated_text:
-                                continue
-                                
-                            # Update text while preserving formatting
-                            run.text = element.translated_text
+                    # 找到匹配的翻译
+                    for element in elements:
+                        if (element.slide_idx == slide_idx and 
+                            element.shape_idx == shape_idx and 
+                            element.original_text.strip() in paragraph.text):
                             
-                            # Apply formatting from the original text
-                            if element.format.font_name:
-                                try:
-                                    run.font.name = element.format.font_name
-                                except Exception as e:
-                                    self.logger.warning(f"Failed to set font name: {str(e)}")
+                            # 处理段落中的每个文本运行
+                            for run in paragraph.runs:
+                                if element.original_text.strip() in run.text:
+                                    # 保存原始格式
+                                    font = run.font
+                                    original_format = {
+                                        'name': font.name,
+                                        'size': font.size,
+                                        'bold': font.bold,
+                                        'italic': font.italic,
+                                        'color': font.color.rgb if font.color else None
+                                    }
                                     
-                            if element.format.font_size:
-                                try:
-                                    run.font.size = element.format.font_size
-                                except Exception as e:
-                                    self.logger.warning(f"Failed to set font size: {str(e)}")
+                                    # 替换文本
+                                    run.text = run.text.replace(
+                                        element.original_text.strip(),
+                                        element.translated_text.strip()
+                                    )
                                     
-                            if element.format.bold is not None:
-                                try:
-                                    run.font.bold = element.format.bold
-                                except Exception as e:
-                                    self.logger.warning(f"Failed to set bold: {str(e)}")
-                                    
-                            if element.format.italic is not None:
-                                try:
-                                    run.font.italic = element.format.italic
-                                except Exception as e:
-                                    self.logger.warning(f"Failed to set italic: {str(e)}")
-                                    
-                            # 修改颜色设置逻辑
-                            if element.format.color:
-                                try:
-                                    if not run.font.color:
-                                        run.font.color.rgb = element.format.color
-                                    elif hasattr(run.font.color, 'rgb'):
-                                        run.font.color.rgb = element.format.color
-                                except Exception as e:
-                                    self.logger.warning(f"Failed to set color: {str(e)}")
+                                    # 重新应用格式
+                                    try:
+                                        if original_format['name']:
+                                            run.font.name = original_format['name']
+                                        if original_format['size']:
+                                            run.font.size = original_format['size']
+                                        if original_format['bold'] is not None:
+                                            run.font.bold = original_format['bold']
+                                        if original_format['italic'] is not None:
+                                            run.font.italic = original_format['italic']
+                                        if original_format['color']:
+                                            if not run.font.color:
+                                                run.font.color.rgb = original_format['color']
+                                            elif hasattr(run.font.color, 'rgb'):
+                                                run.font.color.rgb = original_format['color']
+                                    except Exception as e:
+                                        self.logger.warning(f"Failed to restore format: {str(e)}")
         
-        # Save the modified presentation
+        # 保存修改后的演示文稿
         try:
             prs.save(output_path)
         except Exception as e:
