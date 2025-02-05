@@ -1,5 +1,5 @@
 from pptx import Presentation
-from typing import List, Optional
+from typing import List, Dict, Any, Optional
 import logging
 from dataclasses import dataclass
 from openai import OpenAI
@@ -52,20 +52,12 @@ class PPTTranslator:
                     
                     for paragraph in text_frame.paragraphs:
                         for run in paragraph.runs:
-                            # 修改颜色获取逻辑
-                            color = None
-                            try:
-                                if run.font.color and hasattr(run.font.color, 'rgb'):
-                                    color = run.font.color.rgb
-                            except Exception as e:
-                                self.logger.warning(f"Failed to get color: {str(e)}")
-                            
                             format = TextFormat(
                                 font_name=run.font.name,
                                 font_size=run.font.size,
                                 bold=run.font.bold,
                                 italic=run.font.italic,
-                                color=color  # 使用处理后的颜色值
+                                color=run.font.color.rgb if run.font.color else None
                             )
                             
                             element = TextElement(
@@ -94,6 +86,24 @@ class PPTTranslator:
         except Exception as e:
             self.logger.error(f"Translation failed: {str(e)}")
             return text
+    
+    def translate_elements(self, elements: List[TextElement], target_lang: str) -> List[TextElement]:
+        """Translate text elements to target language"""
+        for element in elements:
+            try:
+                if element.original_text.strip():  # Only translate non-empty text
+                    element.translated_text = self.translate_text(
+                        element.original_text,
+                        target_lang
+                    )
+                else:
+                    element.translated_text = element.original_text
+            except Exception as e:
+                self.logger.error(f"Translation failed for text: {element.original_text}")
+                self.logger.error(str(e))
+                element.translated_text = element.original_text
+                
+        return elements
     
     def replace_text(self, ppt_path: str, elements: List[TextElement], output_path: str):
         """Replace original text with translations while preserving formatting"""
@@ -142,11 +152,9 @@ class PPTTranslator:
                                 except Exception as e:
                                     self.logger.warning(f"Failed to set italic: {str(e)}")
                                     
-                            # 修改颜色设置逻辑
                             if element.format.color:
                                 try:
-                                    if hasattr(run.font.color, 'rgb'):
-                                        run.font.color.rgb = element.format.color
+                                    run.font.color.rgb = element.format.color
                                 except Exception as e:
                                     self.logger.warning(f"Failed to set color: {str(e)}")
         
@@ -157,7 +165,7 @@ class PPTTranslator:
             self.logger.error(f"Failed to save presentation: {str(e)}")
             raise
     
-    def translate_ppt(self, input_path: str, output_path: str, target_lang: str = "zh-CN"):
+    def translate_ppt(self, input_path: str, output_path: str, target_lang: str = "zh-CN", progress_callback=None):
         """
         Translate PowerPoint presentation while preserving formatting.
         
@@ -165,6 +173,7 @@ class PPTTranslator:
             input_path: Path to input PPT file
             output_path: Path to save translated PPT file
             target_lang: Target language code (default: zh-CN)
+            progress_callback: Callback function for progress updates
             
         Raises:
             FileNotFoundError: If input file doesn't exist
@@ -181,11 +190,11 @@ class PPTTranslator:
             # Step 1: Extract text and formatting
             self.logger.info("Extracting text and formatting...")
             elements = self.extract_text_elements(input_path)
-            self.logger.info(f"Found {len(elements)} text elements")
+            total_elements = len(elements)
+            self.logger.info(f"Found {total_elements} text elements")
             
             # Step 2: Translate text
             self.logger.info("Translating text...")
-            total_elements = len(elements)
             translated_elements = []
             
             for i, element in enumerate(elements, 1):
@@ -200,9 +209,9 @@ class PPTTranslator:
                     
                     translated_elements.append(element)
                     
-                    # Log progress every 10%
-                    if i % max(1, total_elements // 10) == 0:
-                        self.logger.info(f"Translation progress: {i}/{total_elements}")
+                    # 调用进度回调
+                    if progress_callback:
+                        progress_callback(i, total_elements)
                     
                 except Exception as e:
                     self.logger.error(f"Failed to translate text: {element.original_text}")
@@ -218,4 +227,4 @@ class PPTTranslator:
             
         except Exception as e:
             self.logger.error(f"Translation failed: {str(e)}")
-            raise
+            raise 
