@@ -52,12 +52,20 @@ class PPTTranslator:
                     
                     for paragraph in text_frame.paragraphs:
                         for run in paragraph.runs:
+                            # 修改颜色获取逻辑
+                            color = None
+                            try:
+                                if run.font.color and hasattr(run.font.color, 'rgb') and run.font.color.rgb:
+                                    color = run.font.color.rgb
+                            except Exception as e:
+                                self.logger.warning(f"Failed to get color: {str(e)}")
+                            
                             format = TextFormat(
                                 font_name=run.font.name,
                                 font_size=run.font.size,
                                 bold=run.font.bold,
                                 italic=run.font.italic,
-                                color=run.font.color.rgb if run.font.color else None
+                                color=color  # 使用处理后的颜色值
                             )
                             
                             element = TextElement(
@@ -152,9 +160,13 @@ class PPTTranslator:
                                 except Exception as e:
                                     self.logger.warning(f"Failed to set italic: {str(e)}")
                                     
+                            # 修改颜色设置逻辑
                             if element.format.color:
                                 try:
-                                    run.font.color.rgb = element.format.color
+                                    if not run.font.color:
+                                        run.font.color.rgb = element.format.color
+                                    elif hasattr(run.font.color, 'rgb'):
+                                        run.font.color.rgb = element.format.color
                                 except Exception as e:
                                     self.logger.warning(f"Failed to set color: {str(e)}")
         
