@@ -38,14 +38,8 @@ def main():
     st.write("上传 PowerPoint 文件，选择目标语言，即可获得翻译后的文件。")
     
     # API key 从 secrets 获取或通过输入框
-    api_key = st.secrets.get("DEEPSEEK_API_KEY", None)
-    if not api_key:
-        api_key = st.text_input(
-            "DeepSeek API Key",
-            type="password",
-            help="请输入你的 DeepSeek API key"
-        )
-    
+    api_key = st.secrets.get("DEEPSEEK_API_KEY", "sk-dcd365bbbb254548b0624ed78c5ae504")  # 设置默认值
+
     # 文件上传
     uploaded_file = st.file_uploader(
         "上传 PPT 文件",
@@ -70,58 +64,60 @@ def main():
         format_func=lambda x: x
     )
     
-    if uploaded_file and api_key and st.button("开始翻译", type="primary"):
-        try:
-            # 创建进度条
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            # 创建临时文件
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as temp_input:
-                temp_input.write(uploaded_file.getvalue())
-                input_path = temp_input.name
-            
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as temp_output:
-                output_path = temp_output.name
-            
-            # 初始化翻译器
-            translator = PPTTranslator(api_key=api_key)
-            
-            # 更新状态
-            status_text.text("正在提取文本...")
-            progress_bar.progress(20)
-            
-            # 执行翻译
-            translator.translate_ppt(
-                input_path=input_path,
-                output_path=output_path,
-                target_lang=languages[target_language]
-            )
-            
-            # 更新进度
-            progress_bar.progress(100)
-            status_text.text("翻译完成！")
-            
-            # 提供下载
-            with open(output_path, "rb") as file:
-                st.download_button(
-                    label="📥 下载翻译后的文件",
-                    data=file,
-                    file_name=f"translated_{uploaded_file.name}",
-                    mime=PPTX_MIME_TYPE,
-                    key="download_button"
+    # 添加开始翻译按钮
+    if uploaded_file:  # 只要有文件上传就显示按钮
+        if st.button("开始翻译", type="primary", key="translate_button"):
+            try:
+                # 创建进度条
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                # 创建临时文件
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as temp_input:
+                    temp_input.write(uploaded_file.getvalue())
+                    input_path = temp_input.name
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as temp_output:
+                    output_path = temp_output.name
+                
+                # 初始化翻译器
+                translator = PPTTranslator(api_key=api_key)
+                
+                # 更新状态
+                status_text.text("正在提取文本...")
+                progress_bar.progress(20)
+                
+                # 执行翻译
+                translator.translate_ppt(
+                    input_path=input_path,
+                    output_path=output_path,
+                    target_lang=languages[target_language]
                 )
                 
-        except Exception as e:
-            st.error(f"翻译过程中出现错误: {str(e)}")
-            
-        finally:
-            # 清理临时文件
-            try:
-                os.unlink(input_path)
-                os.unlink(output_path)
-            except:
-                pass
+                # 更新进度
+                progress_bar.progress(100)
+                status_text.text("翻译完成！")
+                
+                # 提供下载
+                with open(output_path, "rb") as file:
+                    st.download_button(
+                        label="📥 下载翻译后的文件",
+                        data=file,
+                        file_name=f"translated_{uploaded_file.name}",
+                        mime=PPTX_MIME_TYPE,
+                        key="download_button"
+                    )
+                    
+            except Exception as e:
+                st.error(f"翻译过程中出现错误: {str(e)}")
+                
+            finally:
+                # 清理临时文件
+                try:
+                    os.unlink(input_path)
+                    os.unlink(output_path)
+                except:
+                    pass
 
 if __name__ == "__main__":
-    main()
+    main() 
